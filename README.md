@@ -47,6 +47,6 @@ Open http://localhost:8000. WebXR needs HTTPS or `localhost`.
 
 ## Sources
 
-- Worlds use the themes in `omacom/omarchy` on the `quattro` branch. The wallpapers load from `raw.githubusercontent.com`.
+- Worlds use the colors of the themes in `omacom/omarchy` on the `quattro` branch. The sky is the omarchy.org pixel field in the field colors of each theme.
 - Tracks stream from https://radio.omarchy.org.
 - three.js 0.170.0 loads from jsDelivr.
