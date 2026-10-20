@@ -3,8 +3,11 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.m
 import { loadFX, runFX, pixelText, glyphRows, resultsText, BITMAP, WIN_FX, BIG_FX, FAIL_FX, POP_FX } from './omarchy-fx.js';
 
 const HITZ = -0.9, LANES = [-0.9, -0.3, 0.3, 0.9], ROWG = 0.55, NOTE = 0.42, HB = 0.27, SPAWN = 24;
-const SPEED = { easy: 9, normal: 11, hard: 13 };
-const DIFF_LABEL = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
+const SPEED = { easy: 9, normal: 11, hard: 13, expert: 15, expertplus: 17 };
+const DIFF_LABEL = { easy: 'Easy', normal: 'Normal', hard: 'Hard', expert: 'Expert', expertplus: 'Expert+' };
+// the desktop hit window in seconds, and how hard a miss drains the battery
+const WINDOW = { easy: 0.15, normal: 0.13, hard: 0.13, expert: 0.12, expertplus: 0.11 };
+const DRAIN = { easy: 0.7, normal: 1, hard: 1, expert: 1.25, expertplus: 1.5 };
 const MULT = [1, 2, 4, 8], NEED = [2, 4, 8];
 const COMBO_POPS = [25, 50, 100, 150, 200, 300, 400, 500, 750, 1000];
 const HANDS = ['L', 'R'], KS = 6, TRAIL = 18, SPARKS = 640;
@@ -102,6 +105,11 @@ function analyze(buffer) {
   const beats = grid.map((b, i) => { const x = b.c + smo[i]; return { t: x / fps, s: strength(x), k: b.k }; });
   const halves = [];
   for (let i = 0; i < grid.length - 1; i++) { const x = (grid[i].c + smo[i] + grid[i + 1].c + smo[i + 1]) / 2; halves.push({ t: x / fps, s: strength(x), k: grid[i].k + 0.5 }); }
+  const quarters = [];
+  for (let i = 0; i < grid.length - 1; i++) {
+    const a = grid[i].c + smo[i], b = grid[i + 1].c + smo[i + 1];
+    for (const u of [0.25, 0.75]) { const x = a + (b - a) * u; quarters.push({ t: x / fps, s: strength(x), k: grid[i].k + u }); }
+  }
   const bar = [0, 0, 0, 0];
   beats.forEach((b) => { bar[b.k % 4] += b.s; });
   const barOffset = bar.indexOf(Math.max(...bar));
@@ -110,20 +118,28 @@ function analyze(buffer) {
   for (let f = 0; f < N; f++) { const a0 = Math.max(0, f - EW), b0 = Math.min(N, f + EW + 1); env[f] = (rc[b0] - rc[a0]) / (b0 - a0); }
   const e95 = quantile(env, 0.95) || 1;
   const energyAt = (t) => env[clamp(Math.round(t * fps), 0, N - 1)] / e95;
-  return { fps, bpm: (60 * fps) / bp, period: bp / fps, beats, halves, barOffset, energyAt, duration: buffer.duration };
+  return { fps, bpm: (60 * fps) / bp, period: bp / fps, beats, halves, quarters, barOffset, energyAt, duration: buffer.duration };
 }
 
 function generate(an, diff, seed) {
   const R = rng(seed);
-  const C = {
+  // space: the closest two blocks can be, in beats. gap: the same for one hand.
+  // side: horizontal cuts. dblAny: doubles on any strong beat, not only on the bar.
+  // quarter: streams of quarter beats in the loudest parts. spread: blocks on every row.
+  const D = { space: 0.45, diag: 0.22, side: 0, bombGap: 1.8 };
+  const C = { ...D, ...{
     easy: { half: false, q: 0.5, gap: 1.75, dbl: 0, dot: 0.4, bomb: 0, quiet: 0.3 },
     normal: { half: true, hq: 0.92, q: 0.3, gap: 0.95, dbl: 0.35, dot: 0.12, bomb: 0.25, quiet: 0.22 },
     hard: { half: true, hq: 0.7, q: 0.18, gap: 0.45, dbl: 0.5, dot: 0.06, bomb: 0.4, quiet: 0.15 },
-  }[diff];
+    expert: { half: true, hq: 0.45, q: 0.1, gap: 0.45, dbl: 0.55, dblAny: true, dot: 0.03, diag: 0.3, side: 0.08, bomb: 0.5, bombGap: 1.5, quiet: 0.1, spread: true },
+    expertplus: { half: true, hq: 0.3, quarter: true, qq: 0.55, q: 0.05, gap: 0.45, space: 0.22, dbl: 0.6, dblAny: true, dot: 0, diag: 0.32, side: 0.12, bomb: 0.6, bombGap: 1.2, quiet: 0.08, spread: true },
+  }[diff] };
   const bs = an.beats.map((b) => b.s);
   const qB = quantile(bs, C.q), qD = quantile(bs, 0.88), qH = C.half ? quantile(an.halves.map((b) => b.s), C.hq) : 1e9;
+  const qQ = C.quarter ? quantile(an.quarters.map((b) => b.s), C.qq) : 1e9;
   let cands = an.beats.map((b) => ({ ...b, half: false }));
   if (C.half) cands = cands.concat(an.halves.map((b) => ({ ...b, half: true })));
+  if (C.quarter) cands = cands.concat(an.quarters.map((b) => ({ ...b, half: true, quarter: true })));
   cands.sort((x, y) => x.t - y.t);
   const P = an.period, notes = [];
   const H = { L: { last: -99, par: 'down' }, R: { last: -99, par: 'down' } };
@@ -132,23 +148,27 @@ function generate(an, diff, seed) {
     if (c.t < 1.6 || c.t > an.duration - 1.5) continue;
     const e = an.energyAt(c.t);
     if (e < C.quiet) continue;
-    let ok = c.half ? c.s >= qH && e > 0.55 : c.s >= qB * (e > 0.7 ? 0.5 : 1) || (diff !== 'easy' && e > 0.75 && c.s >= qB * 0.25);
+    let ok = c.quarter ? c.s >= qQ && e > 0.65 : c.half ? c.s >= qH && e > 0.55 : c.s >= qB * (e > 0.7 ? 0.5 : 1) || (diff !== 'easy' && e > 0.75 && c.s >= qB * 0.25);
     if (diff === 'easy' && c.k % 2 !== 0 && c.s < qD) ok = false;
-    if (!ok || (c.t - lastT) / P < 0.45) continue;
+    if (!ok || (c.t - lastT) / P < C.space) continue;
     const free = (h) => (c.t - H[h].last) / P >= C.gap - 0.05;
     const pref = lastHand === 'L' ? 'R' : 'L';
     let hands;
     if (free(pref)) hands = [pref]; else if (free(lastHand)) hands = [lastHand]; else continue;
     const onBar = !c.half && (((c.k - an.barOffset) % 4) + 4) % 4 === 0;
-    if (C.dbl && c.s >= qD && onBar && free('L') && free('R') && H.L.par === H.R.par && R() < C.dbl) hands = ['L', 'R'];
+    if (C.dbl && c.s >= qD && (onBar || (C.dblAny && !c.half)) && free('L') && free('R') && H.L.par === H.R.par && R() < C.dbl) hands = ['L', 'R'];
     const dbl = hands.length === 2, r1 = R(), rowR = R();
     for (const h of hands) {
       const par = H[h].par;
       let dir;
       if (!dbl && r1 < C.dot) dir = 8;
-      else if (!dbl && r1 < C.dot + 0.22) dir = h === 'L' ? (par === 'down' ? 4 : 6) : par === 'down' ? 5 : 7;
+      else if (!dbl && r1 < C.dot + C.diag) dir = h === 'L' ? (par === 'down' ? 4 : 6) : par === 'down' ? 5 : 7;
+      // a down swing ends in an outward cut, an up swing in an inward one
+      else if (!dbl && r1 < C.dot + C.diag + C.side) dir = (h === 'L') === (par === 'down') ? 2 : 3;
       else dir = par === 'down' ? 0 : 1;
-      const row = dbl ? 0 : par === 'down' ? (rowR < 0.5 ? 0 : rowR < 0.8 ? 1 : 2) : rowR < 0.7 ? 0 : 1;
+      const row = dbl ? 0 : C.spread
+        ? (par === 'down' ? (rowR < 0.4 ? 0 : rowR < 0.75 ? 1 : 2) : rowR < 0.5 ? 0 : rowR < 0.85 ? 1 : 2)
+        : par === 'down' ? (rowR < 0.5 ? 0 : rowR < 0.8 ? 1 : 2) : rowR < 0.7 ? 0 : 1;
       const col = h === 'L' ? (R() < 0.62 ? 1 : 0) : R() < 0.62 ? 2 : 3;
       notes.push({ t: c.t, hand: h, col, row, dir, type: 'note' });
       H[h].par = par === 'down' ? 'up' : 'down';
@@ -162,7 +182,7 @@ function generate(an, diff, seed) {
       const hn = notes.filter((n) => n.hand === h && n.type === 'note');
       for (let i = 0; i < hn.length - 1; i++) {
         const a = hn[i], b = hn[i + 1];
-        if ((b.t - a.t) / P >= 1.8 && [0, 4, 5].includes(a.dir) && R() < C.bomb) notes.push({ t: (a.t + b.t) / 2, hand: h, col: h === 'L' ? 0 : 3, row: 2, dir: 8, type: 'bomb' });
+        if ((b.t - a.t) / P >= C.bombGap && [0, 4, 5].includes(a.dir) && R() < C.bomb) notes.push({ t: (a.t + b.t) / 2, hand: h, col: h === 'L' ? 0 : 3, row: 2, dir: 8, type: 'bomb' });
       }
     }
     notes.sort((x, y) => x.t - y.t);
@@ -481,7 +501,8 @@ export class Game {
     this.ni = 0;
     this.noteCount = this.map.filter((n) => n.type === 'note').length;
     this.speed = SPEED[difficulty] * (xr ? 1 : 0.85);
-    this.win = 0.13 * this.speed;
+    this.win = WINDOW[difficulty] * this.speed;
+    this.drain = DRAIN[difficulty];
     this.minSp = xr ? 0.6 : 0.8; this.spMin = xr ? 1.0 : 1.5; this.spRange = xr ? 2.5 : 5;
     this.y0 = xr ? clamp((this.camera.position.y || 1.6) * 0.5, 0.62, 1.05) : 0.8;
     this.stats(); this.energy = 0.5;
@@ -1302,7 +1323,7 @@ export class Game {
   }
   _break(amt) {
     this.combo = 0; this.lvl = Math.max(0, this.lvl - 1); this.prog = 0;
-    this.energy = Math.max(0, this.energy - amt);
+    this.energy = Math.max(0, this.energy - amt * this.drain);
     if (this.energy <= 0 && !this.noFail) this._finish(true);
   }
   _finish(failed) {

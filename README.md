@@ -11,7 +11,7 @@ In the lobby:
 - Press `↑` and `↓` to select a track.
 - Press `Enter` to play. Press `Shift+Enter` to start a VR session.
 - Press `T` to go to the next world. Press `Shift+T` to go to the previous world.
-- Select `1`, `2` or `3` in the top bar to set the difficulty.
+- Press `1` to `5`, or select a number in the top bar, to set the difficulty: Easy, Normal, Hard, Expert or Expert+.
 
 In the browser:
 
@@ -28,6 +28,18 @@ In VR:
 2. Select `Enter VR`.
 3. Cut each block with the claw of the same color.
 4. After each track, slash `RETRY`, `NEXT` or `EXIT`.
+
+## Difficulty
+
+| Level | Blocks | Speed | Misses |
+| --- | --- | --- | --- |
+| Easy | Strong beats only, many any-direction dots | Slow | Drain less battery |
+| Normal | Most beats, some doubles and mines | Medium | Normal drain |
+| Hard | Half beats on loud sections, more mines | Fast | Normal drain |
+| Expert | Half beats on most sections, doubles on strong beats, side cuts, blocks on every row | Faster | Drain 25% more battery |
+| Expert+ | Quarter-beat streams on the loudest parts, the most mines, a tighter hit window | Fastest | Drain 50% more battery |
+
+Turn off `no fail` in the top bar to end the track when the battery is empty.
 
 ## Run locally
 

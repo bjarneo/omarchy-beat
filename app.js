@@ -68,6 +68,8 @@ const DIFFS = [
   { id: 'easy', label: 'Easy', note: 'Strong beats only, slow blocks, lots of any-direction dots.' },
   { id: 'normal', label: 'Normal', note: 'A block on most beats, the odd double and a few mines.' },
   { id: 'hard', label: 'Hard', note: 'Half-beats on loud sections, fast blocks, more mines.' },
+  { id: 'expert', label: 'Expert', note: 'Half-beats on most sections, doubles on strong beats, side cuts, faster blocks. Misses drain more battery.' },
+  { id: 'expertplus', label: 'Expert+', note: 'Quarter-beat streams on the loudest parts, the fastest blocks and a tighter hit window. Misses drain the most battery.' },
 ];
 const OPTIONS = { clawLength: 0.62, blades: 3 };
 const ROW = 34;
@@ -95,6 +97,8 @@ class App extends Component {
       if (phase !== 'lobby') return;
       const typing = e.target && e.target.tagName === 'INPUT';
       if ((e.key === 't' || e.key === 'T') && !typing) { this.stepWorld(e.shiftKey ? -1 : 1); return; }
+      const n = +e.key;
+      if (!typing && n >= 1 && n <= DIFFS.length) { this.setState({ diff: DIFFS[n - 1].id }); return; }
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); this.moveSel(e.key === 'ArrowDown' ? 1 : -1); return; }
       if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey && this.state.xr) this.enterVR(); else this.play(); }
     };
@@ -249,7 +253,7 @@ class App extends Component {
   }
 
   lobbyView(s) {
-    const w = WORLDS[s.wi], L = s.load, list = this.filtered(), xrOk = s.xr === true;
+    const w = WORLDS[s.wi], L = s.load, list = this.filtered(), xrOk = s.xr === true, diff = DIFFS.find((d) => d.id === s.diff);
     const pct = !L ? 0 : L.stage === 'fetch' ? L.p * 80 : L.stage === 'decode' ? 85 : L.stage === 'map' ? 94 : L.stage === 'ready' ? 100 : 0;
     const status = !L ? 'Not loaded yet' : L.stage === 'fetch' ? `Downloading · ${Math.round(L.p * 100)}%` : L.stage === 'decode' ? 'Decoding audio' : L.stage === 'map' ? 'Mapping the beat' : L.stage === 'ready' ? `${L.bpm} BPM · ${fmt(L.duration)}` : 'Could not load';
     const toggles = [
@@ -262,9 +266,9 @@ class App extends Component {
           <div class="bar-group">
             <span class="slash" aria-hidden="true">/</span>
             ${DIFFS.map((d, k) => html`
-              <button key=${d.id} class=${cls('diff', d.id === s.diff && 'on')} title=${d.label} aria-pressed=${d.id === s.diff} onClick=${() => this.setState({ diff: d.id })}>${k + 1}</button>
+              <button key=${d.id} class=${cls('diff', d.id === s.diff && 'on')} title=${`${d.label} (${k + 1}): ${d.note}`} aria-pressed=${d.id === s.diff} onClick=${() => this.setState({ diff: d.id })}>${k + 1}</button>
             `)}
-            <span class="diff-label" title=${DIFFS.find((d) => d.id === s.diff).note}>${s.diff}</span>
+            <span class="diff-label" title=${diff.note}>${diff.label.toLowerCase()}</span>
           </div>
           <div class="bar-group world">
             <button class="step" aria-label="Previous world" onClick=${() => this.stepWorld(-1)}>‹</button>
