@@ -33,7 +33,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--t-brand); outli
 #stage { position: absolute; inset: 0; }
 #ui { position: absolute; inset: 0; pointer-events: none; }
 #ui > * { pointer-events: auto; }
-#ui > .lobby, #ui > .hint { pointer-events: none; }
+#ui > .lobby, #ui > .play-controls { pointer-events: none; }
 
 h1, h2 { font-family: Geist, sans-serif; font-weight: 600; margin: 0; }
 
@@ -112,12 +112,16 @@ h1, h2 { font-family: Geist, sans-serif; font-weight: 600; margin: 0; }
 .btn.wide { min-width: 140px; padding: 11px 18px; font-size: 14px; }
 .link { color: var(--t-text); text-decoration: underline; text-underline-offset: 3px; }
 
-/* in-play hint */
-.hint {
-  position: absolute; top: 16px; left: 16px; display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+/* in-play controls */
+.play-controls { position: absolute; top: 16px; left: 16px; display: flex; gap: 8px; }
+.play-controls > * { pointer-events: auto; }
+.chip {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
   font-size: 12px; color: var(--t-text-muted); background: var(--t-bg); box-shadow: var(--t-elev);
 }
-.hint .kbd { font-size: 12px; color: var(--t-text); }
+.chip:hover { color: var(--t-text); box-shadow: inset 0 0 0 1px var(--t-brand); }
+.chip .kbd { font-size: 12px; color: var(--t-text); }
+.card-keys { font-size: 12px; color: var(--t-text-muted); }
 
 /* pause and vr overlays */
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; }

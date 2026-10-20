@@ -18,7 +18,9 @@ In the browser:
 - Move the mouse through each block in the direction of its arrow.
 - The left half of the screen is the left claw. The right half is the right claw.
 - Keep the mouse away from the mines.
-- Press `Esc` or `P` to pause.
+- Press `Esc` or `P` to pause, or select `pause` at the top left.
+- Press `Q` to stop the track and go back to the lobby, or select `stop` at the top left. `Q` also works when the track is paused.
+- On the results screen, press `Esc` or `Q` to go back to the lobby.
 
 In VR:
 

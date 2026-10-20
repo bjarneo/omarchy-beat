@@ -84,7 +84,15 @@ class App extends Component {
     this.applyVars(this.state.wi);
     this.startTyping();
     this.onKey = (e) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || this.state.phase !== 'lobby' || this.state.inVR) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || this.state.inVR) return;
+      const { phase } = this.state, quit = e.key === 'q' || e.key === 'Q';
+      // in a track, Q stops it, also when paused; Esc cancels a track that is still loading
+      if (phase === 'loading' || phase === 'countdown' || phase === 'playing') {
+        if (quit || (e.key === 'Escape' && phase === 'loading')) { e.preventDefault(); this.lobby(); }
+        return;
+      }
+      if (phase === 'results') { if (quit || e.key === 'Escape') this.lobby(); return; }
+      if (phase !== 'lobby') return;
       const typing = e.target && e.target.tagName === 'INPUT';
       if ((e.key === 't' || e.key === 'T') && !typing) { this.stepWorld(e.shiftKey ? -1 : 1); return; }
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); this.moveSel(e.key === 'ArrowDown' ? 1 : -1); return; }
@@ -321,6 +329,7 @@ class App extends Component {
             <button class="btn primary grow" onClick=${() => this.game?.resume()}>Resume</button>
             <button class="btn secondary grow" onClick=${() => this.lobby()}>Quit to lobby</button>
           </div>
+          <div class="card-keys">Esc resume · Q quit to lobby</div>
         </div>
       </div>`;
   }
@@ -370,7 +379,10 @@ class App extends Component {
     return html`
       ${lobbyish && !s.inVR && this.lobbyView(s)}
       ${inPlay && !s.inVR && !s.paused && html`
-        <div class="hint"><span class="kbd">Esc</span><span>pause</span></div>
+        <div class="play-controls">
+          ${s.phase !== 'loading' && html`<button class="chip" title="Pause the track" onClick=${() => this.game?.pause()}><span class="kbd">Esc</span><span>pause</span></button>`}
+          <button class="chip" title="Stop the track and go back to the lobby" onClick=${() => this.lobby()}><span class="kbd">Q</span><span>stop</span></button>
+        </div>
       `}
       ${s.paused && !s.inVR && this.pauseView(s)}
       ${s.phase === 'results' && !s.inVR && this.resultsView(s)}
